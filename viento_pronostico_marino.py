@@ -39,11 +39,11 @@ def prepare_text(location_name, coastal_df, offshore_df, next_day, day_after_nex
     avg_dir_night = (coastal_df.iloc[2]["DIRWI_C"] + coastal_df.iloc[3]["DIRWI_C"]) / 2
 
     text += (
-        f"Durante la mañana del {next_day}, el viento estará del {degrees_to_cardinal(coastal_df.iloc[0]['DIRWI_C'])} "
+        f"Durante la mañana del {next_day}, El viento estará del {degrees_to_cardinal(coastal_df.iloc[0]['DIRWI_C'])} "
         f"{viento_texto(coastal_df.iloc[0]['SPEWI_C'], max_wind_coast)}.\n"
-        f"Durante la tarde del {next_day}, el viento estará del {degrees_to_cardinal(coastal_df.iloc[1]['DIRWI_C'])} "
+        f"Durante la tarde del {next_day}, El viento estará del {degrees_to_cardinal(coastal_df.iloc[1]['DIRWI_C'])} "
         f"{viento_texto(coastal_df.iloc[1]['SPEWI_C'], max_wind_coast)}.\n"
-        f"Durante la noche del {next_day} y madrugada del {day_after_next}, el viento estará del {degrees_to_cardinal(avg_dir_night)} "
+        f"Durante la noche del {next_day} y madrugada del {day_after_next}, El viento estará del {degrees_to_cardinal(avg_dir_night)} "
         f"{viento_texto(max(coastal_df.iloc[2]['SPEWI_C'], coastal_df.iloc[3]['SPEWI_C']), max_wind_coast)}.\n\n"
     )
 
@@ -52,7 +52,7 @@ def prepare_text(location_name, coastal_df, offshore_df, next_day, day_after_nex
         fecha = next_day if i < 3 else day_after_next
         htsgw = offshore_df.iloc[i]['HTSGW_O']
         text += (
-            f"Durante la {label} del {fecha}, el viento estará del {degrees_to_cardinal(offshore_df.iloc[i]['DIRWI_O'])} "
+            f"Durante la {label} del {fecha}, El viento estará del {degrees_to_cardinal(offshore_df.iloc[i]['DIRWI_O'])} "
             f"{viento_texto(offshore_df.iloc[i]['SPEWI_O'], max_wind_offshore)}. "
             f"El oleaje estará predominando del {degrees_to_cardinal(offshore_df.iloc[i]['DIRPW_O'])} "
             f"con alturas de {htsgw:.1f} m, aproximadamente equivalente a {m_to_ft(htsgw)} pie.\n"
