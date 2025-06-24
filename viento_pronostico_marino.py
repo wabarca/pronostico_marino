@@ -1,13 +1,11 @@
 import pandas as pd
 import os
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from datetime import datetime, timedelta
+import math
 
 def degrees_to_cardinal(degrees):
-    """
-    Converts wind direction in degrees to cardinal direction (N, NE, E, etc.).
-    """
     cardinal_directions = [
         "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
         "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
@@ -15,101 +13,126 @@ def degrees_to_cardinal(degrees):
     idx = int((degrees % 360) / 22.5)
     return cardinal_directions[idx]
 
-def mps_to_kph(speed_mps):
-    """
-    Converts speed from meters per second (m/s) to kilometers per hour (km/h).
-    """
-    return round(speed_mps * 3.6)
 
-def prepare_text(location_name, data, next_day, day_after_next):
-    """
-    Prepares the formatted text output for wind data.
-    """
-    coastal = data["coastal"]
-    offshore = data["offshore"]
-    
+def mps_to_kph(speed_mps):
+    return math.ceil(speed_mps * 3.6)
+
+def m_to_ft(height_m):
+    return math.ceil(height_m * 3.28084)
+
+
+def viento_texto(v_min, v_max):
+    v_min_kph = mps_to_kph(v_min)
+    v_max_kph = mps_to_kph(v_max)
+    if v_min_kph == v_max_kph:
+        return f"con velocidades rondando {v_max_kph} km/h"
+    else:
+        return f"con velocidades entre {v_min_kph} km/h y {v_max_kph} km/h"
+
+
+def prepare_text(location_name, coastal_df, offshore_df, next_day, day_after_next):
     text = f"Datos de viento para {location_name}:\n"
-    
-    # Coastal Zone
-    avg_direction = (coastal['wind_direction'].iloc[2] + coastal['wind_direction'].iloc[3]) / 2
-    avg_direction_cardinal = degrees_to_cardinal(avg_direction)
-    
+
+    max_wind_coast = coastal_df["SPEWI_C"].max()
+    max_wind_offshore = offshore_df["SPEWI_O"].max()
+
+    avg_dir_night = (coastal_df.iloc[2]["DIRWI_C"] + coastal_df.iloc[3]["DIRWI_C"]) / 2
+
     text += (
-        f"Durante la mañana del {next_day} el viento estará del {degrees_to_cardinal(coastal['wind_direction'].iloc[0])} "
-        f"con velocidades entre {mps_to_kph(coastal['wind_speed'].iloc[0])} km/h y {mps_to_kph(coastal['max_wind'])} km/h.\n"
-        f"Durante la tarde del {next_day} el viento estará del {degrees_to_cardinal(coastal['wind_direction'].iloc[1])} "
-        f"con velocidades entre {mps_to_kph(coastal['wind_speed'].iloc[1])} km/h y {mps_to_kph(coastal['max_wind'])} km/h.\n"
-        f"Durante la noche del {next_day} y madrugada del {day_after_next} el viento estará del "
-        f"{avg_direction_cardinal} "
-        f"con velocidades entre {mps_to_kph(max(coastal['wind_speed'].iloc[2], coastal['wind_speed'].iloc[3]))} km/h y {mps_to_kph(coastal['max_wind'])} km/h.\n\n"
+        f"Durante la mañana del {next_day}, el viento estará del {degrees_to_cardinal(coastal_df.iloc[0]['DIRWI_C'])} "
+        f"{viento_texto(coastal_df.iloc[0]['SPEWI_C'], max_wind_coast)}.\n"
+        f"Durante la tarde del {next_day}, el viento estará del {degrees_to_cardinal(coastal_df.iloc[1]['DIRWI_C'])} "
+        f"{viento_texto(coastal_df.iloc[1]['SPEWI_C'], max_wind_coast)}.\n"
+        f"Durante la noche del {next_day} y madrugada del {day_after_next}, el viento estará del {degrees_to_cardinal(avg_dir_night)} "
+        f"{viento_texto(max(coastal_df.iloc[2]['SPEWI_C'], coastal_df.iloc[3]['SPEWI_C']), max_wind_coast)}.\n\n"
     )
-    
-    # Offshore Zone
-    text += (
-        f"Datos de viento para {location_name} mar afuera:\n"
-        f"Durante la mañana del {next_day} el viento estará del {degrees_to_cardinal(offshore['wind_direction'].iloc[0])} "
-        f"con velocidades entre {mps_to_kph(offshore['wind_speed'].iloc[0])} km/h y {mps_to_kph(offshore['max_wind'])} km/h.\n"
-        f"Durante la tarde del {next_day} el viento estará del {degrees_to_cardinal(offshore['wind_direction'].iloc[1])} "
-        f"con velocidades entre {mps_to_kph(offshore['wind_speed'].iloc[1])} km/h y {mps_to_kph(offshore['max_wind'])} km/h.\n"
-        f"Durante la noche del {next_day} el viento estará del {degrees_to_cardinal(offshore['wind_direction'].iloc[2])} "
-        f"con velocidades entre {mps_to_kph(offshore['wind_speed'].iloc[2])} km/h y {mps_to_kph(offshore['max_wind'])} km/h.\n"
-        f"Durante la madrugada del {day_after_next} el viento estará del {degrees_to_cardinal(offshore['wind_direction'].iloc[3])} "
-        f"con velocidades entre {mps_to_kph(offshore['wind_speed'].iloc[3])} km/h y {mps_to_kph(offshore['max_wind'])} km/h.\n"
-    )
-    
+
+    text += f"Datos mar afuera para {location_name}:\n"
+    for i, label in enumerate(["mañana", "tarde", "noche", "madrugada"]):
+        fecha = next_day if i < 3 else day_after_next
+        htsgw = offshore_df.iloc[i]['HTSGW_O']
+        text += (
+            f"Durante la {label} del {fecha}, el viento estará del {degrees_to_cardinal(offshore_df.iloc[i]['DIRWI_O'])} "
+            f"{viento_texto(offshore_df.iloc[i]['SPEWI_O'], max_wind_offshore)}. "
+            f"El oleaje estará predominando del {degrees_to_cardinal(offshore_df.iloc[i]['DIRPW_O'])} "
+            f"con alturas de {htsgw:.1f} m, aproximadamente equivalente a {m_to_ft(htsgw)} pie.\n"
+        )
+
     return text
 
 def process_wind_data():
-    # Get the current date to build the path
-    today = datetime.now()
-    tomorrow = today + timedelta(days=1)
-    day_after_tomorrow = today + timedelta(days=2)
-    yy = today.strftime("%y")
-    mm = today.strftime("%m")
-    dd = today.strftime("%d")
-    next_day = tomorrow.strftime("%y/%m/%d")
-    day_after_next = day_after_tomorrow.strftime("%y/%m/%d")
+    if os.environ.get("DISPLAY", "") == "":
+        print("No hay entorno gráfico disponible. Ejecute con entorno X o use un entorno de escritorio.")
+        return
 
-    # Define the file path dynamically based on the date
+    root = tk.Tk()
+    root.withdraw()
+
+    user_date_str = simpledialog.askstring("Fecha requerida", "Ingrese la fecha de los datos a utilizar (formato: dd/mm/yyyy):")
+    if not user_date_str:
+        messagebox.showerror("Error", "No se ingresó ninguna fecha.")
+        return
+
+    try:
+        base_date = datetime.strptime(user_date_str, "%d/%m/%Y")
+    except ValueError:
+        messagebox.showerror("Error", "Formato de fecha inválido. Use el formato dd/mm/yyyy.")
+        return
+
+    yy = base_date.strftime("%y")
+    mm = base_date.strftime("%m")
+    dd = base_date.strftime("%d")
+    target_date = base_date + timedelta(days=1)
+    next_day = target_date.strftime("%Y-%m-%d")
+    day_after_next = (target_date + timedelta(days=1)).strftime("%Y-%m-%d")
+
     relative_path = f"/mnt/gfs-wave/06/GFS-Wave_{yy}{mm}{dd}/Oleaje_Viento.xlsx"
     file_path = os.path.abspath(relative_path)
 
-    # Check if the file exists
     if not os.path.exists(file_path):
-        print(f"Error: No se encontró el archivo en la ruta {file_path}")
+        messagebox.showerror("Error", f"No se encontró el archivo en la ruta {file_path}")
         return
 
-    # Load the Excel file
-    excel_data = pd.ExcelFile(file_path)
+    def load_filtered_data(sheet):
+        df = pd.read_excel(file_path, sheet_name=sheet, header=1)
+        df.columns = [
+            "FECHA_C", "HORA_C", "DIRPW_C", "HTSGW_C", "PERPW_C", "SPEWI_C", "DIRWI_C",
+            "POWPW_C", "Extra_C", "FECHA_O", "HORA_O", "DIRPW_O", "HTSGW_O",
+            "PERPW_O", "SPEWI_O", "DIRWI_O", "POWPW_O"
+        ]
+        year = base_date.year
+        df["FECHA_C"] = pd.to_datetime(df["FECHA_C"].astype(str) + f" {year}", format="%d %b %Y", errors='coerce')
+        df["FECHA_O"] = pd.to_datetime(df["FECHA_O"].astype(str) + f" {year}", format="%d %b %Y", errors='coerce')
+        filtered = df[df["FECHA_C"].dt.date == target_date.date()]
+        if filtered.empty:
+            raise ValueError(f"No se encontraron datos para la fecha {target_date.strftime('%d/%m/%Y')} en la hoja {sheet}.")
+        return filtered
 
-    # Load the relevant sheets for analysis
-    pcoc_data = pd.read_excel(file_path, sheet_name="PCOC", header=None)
-    gofo_data = pd.read_excel(file_path, sheet_name="GOFO", header=None)
+    try:
+        pcoc_data = load_filtered_data("PCOC")
+        gofo_data = load_filtered_data("GOFO")
+    except ValueError as e:
+        messagebox.showerror("Error", str(e))
+        return
 
-    # Generate text reports
-    output_text = prepare_text("Acajutla", {
-        "coastal": {"wind_speed": pcoc_data.loc[8:11, 5], "wind_direction": pcoc_data.loc[8:11, 6], "max_wind": pcoc_data.loc[34, 5]},
-        "offshore": {"wind_speed": pcoc_data.loc[8:11, 14], "wind_direction": pcoc_data.loc[8:11, 15], "max_wind": pcoc_data.loc[34, 14]}
-    }, next_day, day_after_next)
-    output_text += "\n" + prepare_text("La Unión", {
-        "coastal": {"wind_speed": gofo_data.loc[8:11, 5], "wind_direction": gofo_data.loc[8:11, 6], "max_wind": gofo_data.loc[34, 5]},
-        "offshore": {"wind_speed": gofo_data.loc[8:11, 14], "wind_direction": gofo_data.loc[8:11, 15], "max_wind": gofo_data.loc[34, 14]}
-    }, next_day, day_after_next)
+    text_pcoc = prepare_text("Acajutla", pcoc_data, pcoc_data, next_day, day_after_next)
+    text_gofo = prepare_text("La Unión", gofo_data, gofo_data, next_day, day_after_next)
+
+    output_text = text_pcoc + "\n" + text_gofo
 
     output_file_path = os.path.expanduser("~/Pronostico_Marino/Datos_Viento.txt")
-    archive_path = os.path.expanduser(f"~/Pronostico_Marino/archivo/Datos_Viento_{yy}{mm}{tomorrow.strftime('%d')}.txt")
+    archive_path = os.path.expanduser(f"~/Pronostico_Marino/archivo/Datos_Viento_{yy}{mm}{dd}.txt")
 
     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
-    
+
     with open(output_file_path, "w") as file:
         file.write(output_text)
     with open(archive_path, "w") as file:
         file.write(output_text)
-    
-    root = tk.Tk()
-    root.withdraw()
+
     messagebox.showinfo("Proceso Completado", "El proceso ha finalizado exitosamente.")
+
 
 if __name__ == "__main__":
     process_wind_data()
